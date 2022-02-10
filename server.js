@@ -1,7 +1,12 @@
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const { animals } = require('./data/animals');
 const PORT = process.env.PORT || 3001;
 const app = express();
+
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
 function filterByQuery(query, animalsArray) {
     let personalityTraitsArray = [];
@@ -36,6 +41,32 @@ function findById(id, animalsArray) {
     return result;
 }
 
+function createNewAnimal(body, animalsArray) {
+    const animal = body;
+    animalsArray.push(animal);
+    fs.writeFileSync(
+        path.join(__dirname, './data/animals.json'),
+        JSON.stringify({ animals: animalsArray }, null, 2)
+    );
+    return animal;
+}
+
+function validateAnimal(animal) {
+    if (!animal.name || typeof animal.name !== 'string') {
+        return false;
+    }
+    if (!animal.species || typeof animal.species != 'string') {
+        return false;
+    }
+    if (!animal.diet || typeof animal.diet != 'string') {
+        return false;
+    }
+    if (!animal.personalityTraits || !Array.isArray(animal.personalityTraits)) {
+        return false;
+    }
+    return true;
+}
+
 //GET api/animals
 app.get('/api/animals', (req, res) => {
     let results = animals;
@@ -43,7 +74,7 @@ app.get('/api/animals', (req, res) => {
         results = filterByQuery(req.query, results);
     }
     res.json(results);
-})
+});
 //GET api/animals/1
 app.get('/api/animals/:id', (req, res) => {
     const result = findById(req.params.id, animals);
@@ -52,7 +83,24 @@ app.get('/api/animals/:id', (req, res) => {
     } else {
         res.send(404);
     }
-})
+});
+
+//POST api/animals
+app.post('/api/animals', (req, res) => {
+    //set id based on what the next index of the array will be
+    req.body.id = animals.length.toString();
+
+    //if any data in req.body is incorrect, send 404 response
+    if (!validateAnimal(req.body)) {
+        res.status(400).send('the animal is not properly formatted');
+    } else {
+        //add animal to json file and animals array in this function
+        const animal = createNewAnimal(req.body, animals);
+    
+        res.json(animal);
+    }
+
+});
 
 app.listen(PORT, () => {
     console.log(`api server now on port ${PORT}`);
